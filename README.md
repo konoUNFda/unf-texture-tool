@@ -30,17 +30,17 @@
     -   该版本不是很好用，推荐根据功能运行两个独立的脚本。
 
 ## 程序教程
-    <img width="1404" height="970" alt="组 1" src="https://github.com/user-attachments/assets/5510fdb7-9558-47c6-806b-52eb48c5861e" />
-    <img width="1404" height="970" alt="组 2" src="https://github.com/user-attachments/assets/a5dd2c3e-c2fa-4c43-853e-d1a0469c051c" />
-    <img width="1404" height="970" alt="组 3" src="https://github.com/user-attachments/assets/9300e6c9-a4db-44c9-ad27-badc546b1651" />
-    <img width="1404" height="950" alt="组 4" src="https://github.com/user-attachments/assets/ba76860e-0ea2-49c1-b150-140b106df86e" />
-    <img width="1204" height="847" alt="R组 1" src="https://github.com/user-attachments/assets/67ca73af-365d-4d9f-b7b4-4a565dac9b9b" />
-    <img width="1204" height="847" alt="R组 2" src="https://github.com/user-attachments/assets/fa333fc1-3b6c-4bb1-9c29-50e357747c44" />
-    <img width="1204" height="847" alt="R组 3" src="https://github.com/user-attachments/assets/63609634-9288-4325-8c2a-7d20e819929b" />
-    <img width="1204" height="847" alt="R组 4" src="https://github.com/user-attachments/assets/70482e10-513a-4d6d-89d3-7bfaef38d235" />
-    <img width="1204" height="847" alt="R组 5" src="https://github.com/user-attachments/assets/77756af7-b219-4ea8-b8d7-79fe15ee5434" />
-    <img width="1404" height="970" alt="normal" src="https://github.com/user-attachments/assets/e8bddfdc-1d38-4548-bce5-5a91baa39ea9" />
-    <img width="1404" height="970" alt="RGBA" src="https://github.com/user-attachments/assets/2fd18868-b930-43ec-ad86-5b3d05662a24" />
+<img width="1404" height="970" alt="组 1" src="https://github.com/user-attachments/assets/5510fdb7-9558-47c6-806b-52eb48c5861e" />
+<img width="1404" height="970" alt="组 2" src="https://github.com/user-attachments/assets/a5dd2c3e-c2fa-4c43-853e-d1a0469c051c" />
+<img width="1404" height="970" alt="组 3" src="https://github.com/user-attachments/assets/9300e6c9-a4db-44c9-ad27-badc546b1651" />
+<img width="1404" height="950" alt="组 4" src="https://github.com/user-attachments/assets/ba76860e-0ea2-49c1-b150-140b106df86e" />
+<img width="1204" height="847" alt="R组 1" src="https://github.com/user-attachments/assets/67ca73af-365d-4d9f-b7b4-4a565dac9b9b" />
+<img width="1204" height="847" alt="R组 2" src="https://github.com/user-attachments/assets/fa333fc1-3b6c-4bb1-9c29-50e357747c44" />
+<img width="1204" height="847" alt="R组 3" src="https://github.com/user-attachments/assets/63609634-9288-4325-8c2a-7d20e819929b" />
+<img width="1204" height="847" alt="R组 4" src="https://github.com/user-attachments/assets/70482e10-513a-4d6d-89d3-7bfaef38d235" />
+<img width="1204" height="847" alt="R组 5" src="https://github.com/user-attachments/assets/77756af7-b219-4ea8-b8d7-79fe15ee5434" />
+<img width="1404" height="970" alt="normal" src="https://github.com/user-attachments/assets/e8bddfdc-1d38-4548-bce5-5a91baa39ea9" />
+<img width="1404" height="970" alt="RGBA" src="https://github.com/user-attachments/assets/2fd18868-b930-43ec-ad86-5b3d05662a24" />
     增加序号前缀/Export文件夹
     勾选后将会给输出按照顺序增加从1开始的前缀，比如Texture.png咱找Out配置输出就会输出Texture_1_Out.png
 
