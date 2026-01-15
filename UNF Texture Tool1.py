@@ -2,14 +2,14 @@ import sys
 import os
 import glob
 import copy
-import subprocess  # 新增：用于打开文件夹
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QPushButton, QListWidget, QListWidgetItem, QFileDialog,
-                             QSplitter, QFrame, QLineEdit, QCheckBox, QSlider, QGroupBox,
+import subprocess
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QLabel, QPushButton, QListWidget, QListWidgetItem, QFileDialog, 
+                             QSplitter, QFrame, QLineEdit, QCheckBox, QSlider, QGroupBox, 
                              QMessageBox, QSpinBox)
 from PyQt5.QtCore import Qt, QMimeData, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage, QDrag, QFont
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps # 新增：引入 ImageOps 用于反转操作
 
 # 颜色常量映射
 CHANNEL_COLORS = {
@@ -41,7 +41,7 @@ class DraggableChannel(QLabel):
                 border-color: #007acc;
             }}
         """)
-        self.setFixedSize(100, 45)
+        self.setFixedSize(100, 45) 
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -295,6 +295,11 @@ class TexturePacker(QMainWindow):
         self.chk_solid.clicked.connect(self.handle_chk_click)
         mod_lay.addWidget(self.chk_solid)
 
+        # 新增：反转通道勾选框
+        self.chk_invert = QCheckBox("反转通道颜色")
+        self.chk_invert.clicked.connect(self.handle_chk_click)
+        mod_lay.addWidget(self.chk_invert)
+
         def create_val_row(label_text, min_v, max_v, default_v):
             row = QHBoxLayout()
             lbl = QLabel(label_text); lbl.setFixedWidth(80)
@@ -365,7 +370,8 @@ class TexturePacker(QMainWindow):
             counter = 1
             while f"Out{counter}" in existing_names: counter += 1
             name = f"Out{counter}"
-        new_slots = {ch: {"source": ch, "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255 if ch == 'A' else 128} for ch in ['R', 'G', 'B', 'A']}
+        # 新增：is_inverted 初始值为 False
+        new_slots = {ch: {"source": ch, "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255 if ch == 'A' else 128, "is_inverted": False} for ch in ['R', 'G', 'B', 'A']}
         new_out = {"name": name, "slots": new_slots}
         self.outputs.append(new_out)
         self.current_output_index = len(self.outputs) - 1
@@ -401,8 +407,8 @@ class TexturePacker(QMainWindow):
         for target in ['R', 'G', 'B', 'A']:
             new_out = {"name": f"{target}", "slots": {}}
             for slot in ['R', 'G', 'B']:
-                new_out["slots"][slot] = {"source": target, "brightness": 100, "contrast": 100, "is_solid": False, "solid_value": 0}
-            new_out["slots"]['A'] = {"source": 'A', "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255}
+                new_out["slots"][slot] = {"source": target, "brightness": 100, "contrast": 100, "is_solid": False, "solid_value": 0, "is_inverted": False}
+            new_out["slots"]['A'] = {"source": 'A', "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255, "is_inverted": False}
             self.outputs.append(new_out)
         self.current_output_index = 0; self.refresh_list_widget(); self.change_current_output(0)
 
@@ -432,7 +438,11 @@ class TexturePacker(QMainWindow):
         for name, sw in self.slot_widgets.items(): sw.update_style(name == slot_name)
         if not (0 <= self.current_output_index < len(self.outputs)): return
         conf = self.outputs[self.current_output_index]["slots"][slot_name]
+        
+        # 同步勾选框状态
         self.chk_solid.blockSignals(True); self.chk_solid.setChecked(conf["is_solid"]); self.chk_solid.blockSignals(False)
+        self.chk_invert.blockSignals(True); self.chk_invert.setChecked(conf.get("is_inverted", False)); self.chk_invert.blockSignals(False)
+        
         self.sld_solid.setValue(conf["solid_value"]); self.sld_bright.setValue(conf["brightness"]); self.sld_contrast.setValue(conf["contrast"]); self.refresh_previews()
 
     def handle_slot_drop(self):
@@ -447,14 +457,30 @@ class TexturePacker(QMainWindow):
     def update_data_from_ui_no_history(self):
         if not (0 <= self.current_output_index < len(self.outputs)): return
         conf = self.outputs[self.current_output_index]["slots"][self.current_selected_slot]
-        conf["is_solid"] = self.chk_solid.isChecked(); conf["solid_value"] = self.sld_solid.value(); conf["brightness"] = self.sld_bright.value(); conf["contrast"] = self.sld_contrast.value(); self.refresh_previews()
+        conf["is_solid"] = self.chk_solid.isChecked()
+        conf["is_inverted"] = self.chk_invert.isChecked() # 保存反转状态
+        conf["solid_value"] = self.sld_solid.value()
+        conf["brightness"] = self.sld_bright.value()
+        conf["contrast"] = self.sld_contrast.value()
+        self.refresh_previews()
 
     def get_processed_ch(self, slot_conf, size, source_dict=None):
         active_dict = source_dict if source_dict is not None else self.src_channels
-        if slot_conf["is_solid"]: return Image.new("L", size, int(slot_conf["solid_value"]))
-        ch_img = active_dict.get(slot_conf["source"], Image.new("L", size, 0)).copy()
+        
+        # 1. 获取基础图层（纯色或源通道）
+        if slot_conf["is_solid"]: 
+            ch_img = Image.new("L", size, int(slot_conf["solid_value"]))
+        else:
+            ch_img = active_dict.get(slot_conf["source"], Image.new("L", size, 0)).copy()
+        
+        # 2. 亮度与对比度调节
         if slot_conf["brightness"] != 100: ch_img = ImageEnhance.Brightness(ch_img).enhance(slot_conf["brightness"]/100.0)
         if slot_conf["contrast"] != 100: ch_img = ImageEnhance.Contrast(ch_img).enhance(slot_conf["contrast"]/100.0)
+        
+        # 3. 反转操作（新增）
+        if slot_conf.get("is_inverted", False):
+            ch_img = ImageOps.invert(ch_img)
+            
         return ch_img
 
     def refresh_previews(self):
