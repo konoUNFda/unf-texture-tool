@@ -41,7 +41,7 @@
 <img width="1204" height="847" alt="R组 3" src="https://github.com/user-attachments/assets/63609634-9288-4325-8c2a-7d20e819929b" />
 <img width="1204" height="847" alt="R组 4" src="https://github.com/user-attachments/assets/70482e10-513a-4d6d-89d3-7bfaef38d235" />
 <img width="1204" height="847" alt="R组 5" src="https://github.com/user-attachments/assets/77756af7-b219-4ea8-b8d7-79fe15ee5434" />
-<img width="1404" height="970" alt="normal" src="https://github.com/user-attachments/assets/e8bddfdc-1d38-4548-bce5-5a91baa39ea9" />
+<img width="1404" height="970" alt="normal" src="https://github.com/user-attachments/assets/2d0e99a2-19b6-4605-8737-3e02e8bad44e" />
 <img width="1404" height="970" alt="RGBA" src="https://github.com/user-attachments/assets/2fd18868-b930-43ec-ad86-5b3d05662a24" />
     - 增加序号前缀/Export文件夹
     - 勾选后将会给输出按照顺序增加从1开始的前缀，比如Texture.png咱找Out配置输出就会输出Texture_1_Out.png
