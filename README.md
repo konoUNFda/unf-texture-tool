@@ -1,4 +1,4 @@
-# UNF 贴图工具集
+<img width="1404" height="970" alt="image" src="https://github.com/user-attachments/assets/43972743-adb8-4240-b2b9-09d05021f02a" /># UNF 贴图工具集
 
 这是一个使用 Python 和 PyQt5 开发的桌面小工具集，旨在帮助游戏开发者或美术师快速、灵活地处理贴图的 RGBA 通道。项目包含三个独立的脚本，提供了两种核心功能：**通道调整与拆分** 和 **通道合并**。
 
@@ -29,25 +29,22 @@
     -   **核心功能**: 将上述两种工具整合到一个应用程序中，并提供了更现代化、统一的用户界面。您可以在 "Adjuster"（调整器）和 "Packer"（合并器）两个模式之间自由切换。
     -   该版本不是很好用，推荐根据功能运行两个独立的脚本。
 
-## 如何运行
+## 程序教程
+    <img width="1404" height="970" alt="组 1" src="https://github.com/user-attachments/assets/5510fdb7-9558-47c6-806b-52eb48c5861e" />
+    <img width="1404" height="970" alt="组 2" src="https://github.com/user-attachments/assets/a5dd2c3e-c2fa-4c43-853e-d1a0469c051c" />
+    <img width="1404" height="970" alt="组 3" src="https://github.com/user-attachments/assets/9300e6c9-a4db-44c9-ad27-badc546b1651" />
+    <img width="1404" height="950" alt="组 4" src="https://github.com/user-attachments/assets/ba76860e-0ea2-49c1-b150-140b106df86e" />
+    <img width="1204" height="847" alt="R组 1" src="https://github.com/user-attachments/assets/67ca73af-365d-4d9f-b7b4-4a565dac9b9b" />
+    <img width="1204" height="847" alt="R组 2" src="https://github.com/user-attachments/assets/fa333fc1-3b6c-4bb1-9c29-50e357747c44" />
+    <img width="1204" height="847" alt="R组 3" src="https://github.com/user-attachments/assets/63609634-9288-4325-8c2a-7d20e819929b" />
+    <img width="1204" height="847" alt="R组 4" src="https://github.com/user-attachments/assets/70482e10-513a-4d6d-89d3-7bfaef38d235" />
+    <img width="1204" height="847" alt="R组 5" src="https://github.com/user-attachments/assets/77756af7-b219-4ea8-b8d7-79fe15ee5434" />
+    <img width="1404" height="970" alt="normal" src="https://github.com/user-attachments/assets/e8bddfdc-1d38-4548-bce5-5a91baa39ea9" />
+    <img width="1404" height="970" alt="RGBA" src="https://github.com/user-attachments/assets/2fd18868-b930-43ec-ad86-5b3d05662a24" />
+    增加序号前缀/Export文件夹
+    勾选后将会给输出按照顺序增加从1开始的前缀，比如Texture.png咱找Out配置输出就会输出Texture_1_Out.png
 
-1.  **安装依赖:**
-    确保你的 Python 环境中安装了必要的库。打开终端或命令行，进入项目根目录，然后运行以下命令：
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-2.  **运行程序:**
-    在终端或命令行中选择你想要运行的脚本：
-
-    ```bash
-    # 运行二合一整合版
-    python "UNF Texture Tool2in1.py"
-
-    # 或者单独运行某个工具
-    python "UNF Texture Tool1.py"
-    python "UNF Texture Tool2.py"
-    ```
 
 ## 程序说明
 若在使用中发现 Bug 或有功能建议，欢迎提交 Issue 或 Pull Request。
+虽然但是，因为整篇都是ai写的，我没有能力很好的修复，只能尽力而为了。
