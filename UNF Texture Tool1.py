@@ -6,12 +6,17 @@ import subprocess
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QListWidget, QListWidgetItem, QFileDialog, 
                              QSplitter, QFrame, QLineEdit, QCheckBox, QSlider, QGroupBox, 
-                             QMessageBox, QSpinBox)
+                             QMessageBox, QSpinBox, QAbstractItemView)
 from PyQt5.QtCore import Qt, QMimeData, pyqtSignal
-from PyQt5.QtGui import QPixmap, QImage, QDrag, QFont
-from PIL import Image, ImageEnhance, ImageOps # 新增：引入 ImageOps 用于反转操作
+from PyQt5.QtGui import QPixmap, QImage, QDrag, QFont, QIcon
+from PIL import Image, ImageEnhance, ImageOps 
 
-# 颜色常量映射
+def resource_path(relative_path):
+    """ 获取资源的绝对路径，兼容 PyInstaller 打包后的路径 """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 CHANNEL_COLORS = {
     'R': "#A00000", # 深红
     'G': "#008000", # 深绿
@@ -20,7 +25,33 @@ CHANNEL_COLORS = {
 }
 
 # ===========================
-# 左侧可拖拽按钮
+# 自定义支持拖入文件夹的按钮
+# ===========================
+class DropButton(QPushButton):
+    folder_dropped = pyqtSignal(str)
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            url = event.mimeData().urls()[0].toLocalFile()
+            if os.path.isdir(url):
+                event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            path = urls[0].toLocalFile()
+            if os.path.isdir(path):
+                self.folder_dropped.emit(path)
+                event.acceptProposedAction()
+
+# ===========================
+# 左侧源通道按钮
 # ===========================
 class DraggableChannel(QLabel):
     def __init__(self, text, channel_type, parent=None):
@@ -53,7 +84,7 @@ class DraggableChannel(QLabel):
             drag.exec_(Qt.CopyAction)
 
 # ===========================
-# 通道槽类
+# 通道槽位
 # ===========================
 class DropChannelSlot(QLabel):
     clicked = pyqtSignal(str) 
@@ -106,8 +137,12 @@ class DropChannelSlot(QLabel):
 class TexturePacker(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("UNF的拆分工具")
+        self.setWindowTitle("UNF的贴图拆分工具v1.2")
+        icon_path = resource_path("tmr.ico")
+        self.setWindowIcon(QIcon(icon_path))
         self.resize(1400, 850)
+        
+        # 开启窗口层级的拖拽支持
         self.setAcceptDrops(True)
         
         self.src_image_path = None
@@ -122,7 +157,6 @@ class TexturePacker(QMainWindow):
         self.redo_stack = []
         self.max_history = 20
 
-        self.normal_mode_state = 0 
         self.create_default_output_data()
         self.init_ui()
         
@@ -130,33 +164,12 @@ class TexturePacker(QMainWindow):
             self.list_outputs.setCurrentRow(0)
             self.change_current_output(0)
 
-    def save_state(self):
-        state = copy.deepcopy(self.outputs)
-        self.history_stack.append(state)
-        if len(self.history_stack) > self.max_history: self.history_stack.pop(0)
-        self.redo_stack.clear()
-
-    def undo(self):
-        if not self.history_stack: return
-        self.redo_stack.append(copy.deepcopy(self.outputs))
-        self.outputs = self.history_stack.pop()
-        self._sync_ui()
-
-    def redo(self):
-        if not self.redo_stack: return
-        self.history_stack.append(copy.deepcopy(self.outputs))
-        self.outputs = self.redo_stack.pop()
-        self._sync_ui()
-
-    def _sync_ui(self):
-        if self.current_output_index >= len(self.outputs): self.current_output_index = len(self.outputs) - 1
-        self.refresh_list_widget()
-        self.change_current_output(self.current_output_index)
-        self.refresh_previews()
-
+    # --- 拖拽图片导入逻辑 ---
     def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls(): event.accept()
-        else: event.ignore()
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def dropEvent(self, event):
         urls = event.mimeData().urls()
@@ -165,7 +178,13 @@ class TexturePacker(QMainWindow):
             ext = os.path.splitext(file_path)[1].lower()
             if ext in ['.png', '.jpg', '.jpeg', '.tga', '.bmp']:
                 self.load_image_by_path(file_path)
-                event.accept()
+                event.acceptProposedAction()
+
+    def save_state(self):
+        state = copy.deepcopy(self.outputs)
+        self.history_stack.append(state)
+        if len(self.history_stack) > self.max_history: self.history_stack.pop(0)
+        self.redo_stack.clear()
 
     def init_ui(self):
         font = QFont("Microsoft YaHei", 9)
@@ -252,7 +271,15 @@ class TexturePacker(QMainWindow):
         list_btn_layout.addLayout(row_btns); list_btn_layout.addLayout(row_modes)
 
         self.list_outputs = QListWidget()
+        self.list_outputs.setDragEnabled(True)
+        self.list_outputs.setAcceptDrops(True)
+        self.list_outputs.setDropIndicatorShown(True)
+        self.list_outputs.setDragDropMode(QAbstractItemView.InternalMove)
+        self.list_outputs.setDefaultDropAction(Qt.MoveAction)
+        
+        self.list_outputs.model().rowsMoved.connect(self.handle_list_reorder)
         self.list_outputs.currentRowChanged.connect(self.change_current_output)
+
         self.edit_name = QLineEdit()
         self.edit_name.setPlaceholderText("重命名当前输出...")
         self.edit_name.editingFinished.connect(self.rename_output_final)
@@ -268,7 +295,7 @@ class TexturePacker(QMainWindow):
 
         mid_vbox.addWidget(QLabel("<b>输出预览</b>"))
         mid_vbox.addWidget(self.lbl_out_preview)
-        mid_vbox.addWidget(QLabel("<b>输出列表</b>"))
+        mid_vbox.addWidget(QLabel("<b>输出列表 (拖拽可排序)</b>"))
         mid_vbox.addLayout(list_btn_layout)
         mid_vbox.addWidget(self.list_outputs)
         mid_vbox.addWidget(self.edit_name)
@@ -295,7 +322,6 @@ class TexturePacker(QMainWindow):
         self.chk_solid.clicked.connect(self.handle_chk_click)
         mod_lay.addWidget(self.chk_solid)
 
-        # 新增：反转通道勾选框
         self.chk_invert = QCheckBox("反转通道颜色")
         self.chk_invert.clicked.connect(self.handle_chk_click)
         mod_lay.addWidget(self.chk_invert)
@@ -327,15 +353,15 @@ class TexturePacker(QMainWindow):
         
         self.chk_smart_export = QCheckBox("增加序号前缀 / Export文件夹")
         self.chk_smart_export.setChecked(True)
-        self.chk_smart_export.setStyleSheet("color: #d86210; font-weight: bold;")
         
         btn_run = QPushButton("执行合并 (导出当前)")
-        btn_run.setStyleSheet("background-color: #0e639c; color: white; height: 45px; font-weight: bold; border: none; border-radius: 4px;")
+        btn_run.setStyleSheet("background-color: #0e639c; color: white; height: 45px; font-weight: bold;")
         btn_run.clicked.connect(self.process_single)
         
-        btn_batch = QPushButton("批量处理文件夹")
-        btn_batch.setStyleSheet("background-color: #d86210; color: white; height: 45px; font-weight: bold; border: none; border-radius: 4px;")
-        btn_batch.clicked.connect(self.process_batch_dialog)
+        self.btn_batch = DropButton("批量处理文件夹 (可拖入)")
+        self.btn_batch.setStyleSheet("background-color: #d86210; color: white; height: 45px; font-weight: bold;")
+        self.btn_batch.clicked.connect(self.batch_select_and_run)
+        self.btn_batch.folder_dropped.connect(self.execute_batch_process)
 
         right_vbox.addWidget(QLabel("<b>当前通道预览</b>"))
         right_vbox.addWidget(self.lbl_chan_preview, 0, Qt.AlignCenter)
@@ -343,7 +369,7 @@ class TexturePacker(QMainWindow):
         right_vbox.addStretch()
         right_vbox.addWidget(self.lbl_path_display); right_vbox.addWidget(btn_select_dir)
         right_vbox.addWidget(self.chk_smart_export) 
-        right_vbox.addWidget(btn_run); right_vbox.addWidget(btn_batch)
+        right_vbox.addWidget(btn_run); right_vbox.addWidget(self.btn_batch)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left_panel); splitter.addWidget(mid_panel); splitter.addWidget(right_panel)
@@ -352,17 +378,15 @@ class TexturePacker(QMainWindow):
         self.refresh_list_widget()
 
     # ================= 业务逻辑 =================
-    def open_folder(self, path):
-        """新增：跨平台打开文件夹功能"""
-        try:
-            if sys.platform == 'win32':
-                os.startfile(path)
-            elif sys.platform == 'darwin':
-                subprocess.Popen(['open', path])
-            else:
-                subprocess.Popen(['xdg-open', path])
-        except Exception as e:
-            print(f"无法打开文件夹: {e}")
+
+    def handle_list_reorder(self, parent, start, end, destination, row):
+        if start == row: return
+        self.save_state()
+        moving_data = self.outputs.pop(start)
+        new_pos = row if row < start else row - 1
+        if new_pos < 0: new_pos = 0
+        self.outputs.insert(new_pos, moving_data)
+        self.current_output_index = self.list_outputs.currentRow()
 
     def create_default_output_data(self, name=None):
         if name is None:
@@ -370,22 +394,38 @@ class TexturePacker(QMainWindow):
             counter = 1
             while f"Out{counter}" in existing_names: counter += 1
             name = f"Out{counter}"
-        # 新增：is_inverted 初始值为 False
         new_slots = {ch: {"source": ch, "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255 if ch == 'A' else 128, "is_inverted": False} for ch in ['R', 'G', 'B', 'A']}
-        new_out = {"name": name, "slots": new_slots}
-        self.outputs.append(new_out)
+        self.outputs.append({"name": name, "slots": new_slots})
         self.current_output_index = len(self.outputs) - 1
-        return new_out
 
-    def load_image_dialog(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "图片文件 (*.png *.jpg *.jpeg *.tga *.bmp)")
-        if path: self.load_image_by_path(path)
+    def change_current_output(self, index):
+        if index < 0 or index >= len(self.outputs): return
+        self.current_output_index = index
+        data = self.outputs[index]
+        self.edit_name.blockSignals(True); self.edit_name.setText(data["name"]); self.edit_name.blockSignals(False)
+        for ch in ['R', 'G', 'B', 'A']:
+            self.slot_widgets[ch].source_channel = data["slots"][ch]["source"]
+            self.slot_widgets[ch].update_display()
+        self.select_slot_for_editing(self.current_selected_slot)
 
-    def load_image_by_path(self, path):
-        self.src_image_path = path; self.src_image = Image.open(path).convert("RGBA")
-        chs = self.src_image.split(); self.src_channels = {'R': chs[0], 'G': chs[1], 'B': chs[2], 'A': chs[3]}
-        self.update_img_label(self.lbl_src_preview, self.src_image); self.refresh_previews()
-        if not self.output_dir: self.output_dir = os.path.dirname(path); self.lbl_path_display.setText(f"输出目录: {self.output_dir}")
+    def select_slot_for_editing(self, slot_name):
+        self.current_selected_slot = slot_name
+        for name, sw in self.slot_widgets.items(): sw.update_style(name == slot_name)
+        if not (0 <= self.current_output_index < len(self.outputs)): return
+        conf = self.outputs[self.current_output_index]["slots"][slot_name]
+        self.chk_solid.blockSignals(True); self.chk_solid.setChecked(conf["is_solid"]); self.chk_solid.blockSignals(False)
+        self.chk_invert.blockSignals(True); self.chk_invert.setChecked(conf.get("is_inverted", False)); self.chk_invert.blockSignals(False)
+        self.sld_solid.setValue(conf["solid_value"]); self.sld_bright.setValue(conf["brightness"]); self.sld_contrast.setValue(conf["contrast"]); self.refresh_previews()
+
+    def handle_slot_drop(self):
+        if self.current_output_index < 0: return
+        target_slot = self.sender()
+        if not target_slot: return
+        target_name = target_slot.channel_name 
+        self.save_state()
+        for ch in ['R', 'G', 'B', 'A']: self.outputs[self.current_output_index]["slots"][ch]["source"] = self.slot_widgets[ch].source_channel
+        self.outputs[self.current_output_index]["slots"][target_name]["is_solid"] = False
+        self.select_slot_for_editing(target_name)
 
     def refresh_list_widget(self):
         self.list_outputs.blockSignals(True); self.list_outputs.clear()
@@ -393,94 +433,20 @@ class TexturePacker(QMainWindow):
         if 0 <= self.current_output_index < len(self.outputs): self.list_outputs.setCurrentRow(self.current_output_index)
         self.list_outputs.blockSignals(False)
 
-    def toggle_normal_mode(self):
-        if self.current_output_index < 0: return
-        self.save_state(); current_out = self.outputs[self.current_output_index]; conf_b = current_out["slots"]['B']
-        if self.normal_mode_state == 0:
-            conf_b["is_solid"] = True; conf_b["solid_value"] = 255; current_out["name"] = "N"; self.normal_mode_state = 1
-        elif self.normal_mode_state == 1: conf_b["solid_value"] = 0; self.normal_mode_state = 2
-        else: self.normal_mode_state = 0
-        self.refresh_list_widget(); self.change_current_output(self.current_output_index)
-
-    def split_channels_mode(self):
-        self.save_state(); self.outputs = []
-        for target in ['R', 'G', 'B', 'A']:
-            new_out = {"name": f"{target}", "slots": {}}
-            for slot in ['R', 'G', 'B']:
-                new_out["slots"][slot] = {"source": target, "brightness": 100, "contrast": 100, "is_solid": False, "solid_value": 0, "is_inverted": False}
-            new_out["slots"]['A'] = {"source": 'A', "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255, "is_inverted": False}
-            self.outputs.append(new_out)
-        self.current_output_index = 0; self.refresh_list_widget(); self.change_current_output(0)
-
-    def change_current_output(self, index):
-        if index < 0 or index >= len(self.outputs): return
-        self.current_output_index = index; data = self.outputs[index]
-        self.edit_name.blockSignals(True); self.edit_name.setText(data["name"]); self.edit_name.blockSignals(False)
-        for ch in ['R', 'G', 'B', 'A']: self.slot_widgets[ch].source_channel = data["slots"][ch]["source"]; self.slot_widgets[ch].update_display()
-        self.select_slot_for_editing(self.current_selected_slot)
-
-    def add_output_ui(self):
-        self.save_state(); self.create_default_output_data(); self.refresh_list_widget(); self.list_outputs.setCurrentRow(len(self.outputs) - 1)
-
-    def remove_output_ui(self):
-        if len(self.outputs) > 1:
-            self.save_state(); row = self.list_outputs.currentRow(); del self.outputs[row]
-            self.current_output_index = max(0, row-1); self.refresh_list_widget(); self.change_current_output(self.current_output_index)
-
-    def rename_output_final(self):
-        if 0 <= self.current_output_index < len(self.outputs):
-            new_name = self.edit_name.text()
-            if self.outputs[self.current_output_index]["name"] != new_name:
-                self.save_state(); self.outputs[self.current_output_index]["name"] = new_name; self.refresh_list_widget()
-
-    def select_slot_for_editing(self, slot_name):
-        self.current_selected_slot = slot_name
-        for name, sw in self.slot_widgets.items(): sw.update_style(name == slot_name)
-        if not (0 <= self.current_output_index < len(self.outputs)): return
-        conf = self.outputs[self.current_output_index]["slots"][slot_name]
-        
-        # 同步勾选框状态
-        self.chk_solid.blockSignals(True); self.chk_solid.setChecked(conf["is_solid"]); self.chk_solid.blockSignals(False)
-        self.chk_invert.blockSignals(True); self.chk_invert.setChecked(conf.get("is_inverted", False)); self.chk_invert.blockSignals(False)
-        
-        self.sld_solid.setValue(conf["solid_value"]); self.sld_bright.setValue(conf["brightness"]); self.sld_contrast.setValue(conf["contrast"]); self.refresh_previews()
-
-    def handle_slot_drop(self):
-        if self.current_output_index < 0: return
-        self.save_state()
-        for ch in ['R', 'G', 'B', 'A']: self.outputs[self.current_output_index]["slots"][ch]["source"] = self.slot_widgets[ch].source_channel
-        self.outputs[self.current_output_index]["slots"][self.current_selected_slot]["is_solid"] = False; self.select_slot_for_editing(self.current_selected_slot)
-
-    def handle_chk_click(self): self.save_state(); self.update_data_from_ui_no_history()
-    def handle_slider_released(self): self.save_state()
-
     def update_data_from_ui_no_history(self):
         if not (0 <= self.current_output_index < len(self.outputs)): return
         conf = self.outputs[self.current_output_index]["slots"][self.current_selected_slot]
-        conf["is_solid"] = self.chk_solid.isChecked()
-        conf["is_inverted"] = self.chk_invert.isChecked() # 保存反转状态
-        conf["solid_value"] = self.sld_solid.value()
-        conf["brightness"] = self.sld_bright.value()
-        conf["contrast"] = self.sld_contrast.value()
+        conf["is_solid"] = self.chk_solid.isChecked(); conf["is_inverted"] = self.chk_invert.isChecked() 
+        conf["solid_value"] = self.sld_solid.value(); conf["brightness"] = self.sld_bright.value(); conf["contrast"] = self.sld_contrast.value()
         self.refresh_previews()
 
     def get_processed_ch(self, slot_conf, size, source_dict=None):
         active_dict = source_dict if source_dict is not None else self.src_channels
-        
-        # 1. 获取基础图层（纯色或源通道）
-        if slot_conf["is_solid"]: 
-            ch_img = Image.new("L", size, int(slot_conf["solid_value"]))
-        else:
-            ch_img = active_dict.get(slot_conf["source"], Image.new("L", size, 0)).copy()
-        
-        # 2. 亮度与对比度调节
+        if slot_conf["is_solid"]: ch_img = Image.new("L", size, int(slot_conf["solid_value"]))
+        else: ch_img = active_dict.get(slot_conf["source"], Image.new("L", size, 0)).copy()
         if slot_conf["brightness"] != 100: ch_img = ImageEnhance.Brightness(ch_img).enhance(slot_conf["brightness"]/100.0)
         if slot_conf["contrast"] != 100: ch_img = ImageEnhance.Contrast(ch_img).enhance(slot_conf["contrast"]/100.0)
-        
-        # 3. 反转操作（新增）
-        if slot_conf.get("is_inverted", False):
-            ch_img = ImageOps.invert(ch_img)
-            
+        if slot_conf.get("is_inverted", False): ch_img = ImageOps.invert(ch_img)
         return ch_img
 
     def refresh_previews(self):
@@ -493,44 +459,107 @@ class TexturePacker(QMainWindow):
     def update_img_label(self, label, pil_img):
         tmp = pil_img.copy(); tmp.thumbnail((label.width(), label.height())); qimg = QImage(tmp.convert("RGBA").tobytes("raw", "RGBA"), tmp.size[0], tmp.size[1], QImage.Format_RGBA8888); label.setPixmap(QPixmap.fromImage(qimg))
 
+    def load_image_dialog(self):
+        path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "图片文件 (*.png *.jpg *.jpeg *.tga *.bmp)")
+        if path: self.load_image_by_path(path)
+
+    def load_image_by_path(self, path):
+        try:
+            self.src_image_path = path; self.src_image = Image.open(path).convert("RGBA")
+            chs = self.src_image.split(); self.src_channels = {'R': chs[0], 'G': chs[1], 'B': chs[2], 'A': chs[3]}
+            self.update_img_label(self.lbl_src_preview, self.src_image); self.refresh_previews()
+            if not self.output_dir: self.output_dir = os.path.dirname(path); self.lbl_path_display.setText(f"输出目录: {self.output_dir}")
+        except: pass
+
     def select_output_directory(self):
-        d = QFileDialog.getExistingDirectory(self, "选择输出目录"); 
+        d = QFileDialog.getExistingDirectory(self, "选择输出目录")
         if d: self.output_dir = d; self.lbl_path_display.setText(f"输出目录: {d}")
 
-    def process_single(self):
-        if not self.src_image_path: return
-        target_dir = self.export_image(self.src_image_path)
-        QMessageBox.information(self, "成功", "导出完成！")
-        if target_dir: self.open_folder(target_dir) # 导出后打开
+    def batch_select_and_run(self):
+        folder = QFileDialog.getExistingDirectory(self, "选择源文件夹")
+        if folder: self.execute_batch_process(folder)
 
-    def process_batch_dialog(self):
-        folder = QFileDialog.getExistingDirectory(self, "选择源文件夹"); 
-        if not folder: return
+    def execute_batch_process(self, folder):
         files = []
-        for e in ['*.png', '*.jpg', '*.tga', '*.bmp']: files.extend(glob.glob(os.path.join(folder, e)) + glob.glob(os.path.join(folder, e.upper())))
+        for ext in ['*.png', '*.jpg', '*.jpeg', '*.tga', '*.bmp']:
+            files.extend(glob.glob(os.path.join(folder, ext)) + glob.glob(os.path.join(folder, ext.upper())))
+        if not files: return
         last_dir = None
         for f in files: last_dir = self.export_image(f)
         QMessageBox.information(self, "批量完成", f"已处理 {len(files)} 个文件。")
-        if last_dir: self.open_folder(last_dir) # 导出后打开
+        if last_dir: self.open_folder(last_dir) 
 
     def export_image(self, file_path):
         try:
             temp_img = Image.open(file_path).convert("RGBA"); base_name = os.path.splitext(os.path.basename(file_path))[0]
             size = temp_img.size; chs = temp_img.split(); temp_dict = {'R': chs[0], 'G': chs[1], 'B': chs[2], 'A': chs[3]}
-            
             target_dir = self.output_dir if self.output_dir else os.path.dirname(file_path)
             if self.chk_smart_export.isChecked():
                 target_dir = os.path.join(target_dir, "Export")
                 if not os.path.exists(target_dir): os.makedirs(target_dir)
-
             for idx, out in enumerate(self.outputs):
                 final_chs = [self.get_processed_ch(out["slots"][c], size, temp_dict) for c in ['R', 'G', 'B', 'A']]
                 save_name = f"{base_name}_{idx+1}_{out['name']}.png" if self.chk_smart_export.isChecked() else f"{base_name}_{out['name']}.png"
                 Image.merge("RGBA", tuple(final_chs)).save(os.path.join(target_dir, save_name))
-            return target_dir # 返回最终保存目录
-        except Exception as e: 
-            print(f"错误: {e}")
-            return None
+            return target_dir 
+        except: return None
+
+    def open_folder(self, path):
+        try:
+            if sys.platform == 'win32': os.startfile(path)
+            elif sys.platform == 'darwin': subprocess.Popen(['open', path])
+            else: subprocess.Popen(['xdg-open', path])
+        except: pass
+
+    def handle_chk_click(self): self.save_state(); self.update_data_from_ui_no_history()
+    def handle_slider_released(self): self.save_state()
+    def add_output_ui(self): self.save_state(); self.create_default_output_data(); self.refresh_list_widget(); self.list_outputs.setCurrentRow(len(self.outputs) - 1)
+    def remove_output_ui(self):
+        if len(self.outputs) > 1:
+            self.save_state(); row = self.list_outputs.currentRow(); del self.outputs[row]
+            self.current_output_index = max(0, row-1); self.refresh_list_widget(); self.change_current_output(self.current_output_index)
+    def rename_output_final(self):
+        if 0 <= self.current_output_index < len(self.outputs):
+            new_name = self.edit_name.text()
+            if self.outputs[self.current_output_index]["name"] != new_name:
+                self.save_state(); self.outputs[self.current_output_index]["name"] = new_name; self.refresh_list_widget()
+
+    # --- 法线模式逻辑修复 ---
+    def toggle_normal_mode(self):
+        if self.current_output_index < 0: return
+        self.save_state()
+        current_out = self.outputs[self.current_output_index]
+        slots = current_out["slots"]
+
+        if current_out["name"] != "N":
+            # 逻辑1：如果名字不是N，改成N，B换纯白
+            current_out["name"] = "N"
+            slots['B']["is_solid"] = True
+            slots['B']["solid_value"] = 255
+        else:
+            # 逻辑2：如果名字已经是N，B保持纯白，切换G的反转
+            slots['B']["is_solid"] = True
+            slots['B']["solid_value"] = 255
+            slots['G']["is_inverted"] = not slots['G'].get("is_inverted", False)
+
+        # 同步 UI 列表名和数据
+        self.refresh_list_widget()
+        self.change_current_output(self.current_output_index)
+
+    def split_channels_mode(self):
+        self.save_state(); self.outputs = []
+        for target in ['R', 'G', 'B', 'A']:
+            new_out = {"name": f"{target}", "slots": {}}
+            for slot in ['R', 'G', 'B']: new_out["slots"][slot] = {"source": target, "brightness": 100, "contrast": 100, "is_solid": False, "solid_value": 0, "is_inverted": False}
+            new_out["slots"]['A'] = {"source": 'A', "brightness": 100, "contrast": 100, "is_solid": True, "solid_value": 255, "is_inverted": False}
+            self.outputs.append(new_out)
+        self.current_output_index = 0; self.refresh_list_widget(); self.change_current_output(0)
+
+    def process_single(self):
+        if not self.src_image_path: return
+        target_dir = self.export_image(self.src_image_path)
+        QMessageBox.information(self, "成功", "导出完成！")
+        if target_dir: self.open_folder(target_dir) 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv); window = TexturePacker(); window.show(); sys.exit(app.exec_())
