@@ -41,8 +41,8 @@
 <img width="1204" height="847" alt="R组 5" src="https://github.com/user-attachments/assets/77756af7-b219-4ea8-b8d7-79fe15ee5434" />
 <img width="1404" height="970" alt="normal" src="https://github.com/user-attachments/assets/e8bddfdc-1d38-4548-bce5-5a91baa39ea9" />
 <img width="1404" height="970" alt="RGBA" src="https://github.com/user-attachments/assets/2fd18868-b930-43ec-ad86-5b3d05662a24" />
-    增加序号前缀/Export文件夹
-    勾选后将会给输出按照顺序增加从1开始的前缀，比如Texture.png咱找Out配置输出就会输出Texture_1_Out.png
+    - 增加序号前缀/Export文件夹
+    - 勾选后将会给输出按照顺序增加从1开始的前缀，比如Texture.png咱找Out配置输出就会输出Texture_1_Out.png
 
 
 ## 程序说明
