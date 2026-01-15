@@ -6,8 +6,13 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QMessageBox, QSpinBox, QComboBox, QListWidget, QCheckBox, 
                              QAbstractItemView, QListWidgetItem, QTextEdit, QLineEdit)
 from PyQt5.QtCore import Qt, QMimeData, pyqtSignal, QTimer
-from PyQt5.QtGui import QPixmap, QImage, QFont, QDrag
+from PyQt5.QtGui import QPixmap, QImage, QFont, QDrag, QIcon 
 from PIL import Image
+def resource_path(relative_path):
+    """ 获取资源的绝对路径，兼容 PyInstaller 打包后的路径 """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 # ============================================================
 # 全局样式表 (纯白背景，参考 Tool1.py 视觉)
@@ -200,6 +205,8 @@ class MegaPacker(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("UNF 纹理通道合并工具")
+        icon_path = resource_path("tmr.ico")
+        self.setWindowIcon(QIcon(icon_path))
         self.resize(1150, 780)
         self.preview_timer = QTimer()
         self.preview_timer.setSingleShot(True)
